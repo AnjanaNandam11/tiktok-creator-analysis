@@ -4,7 +4,6 @@ gunicorn
 sqlalchemy
 pandas
 scikit-learn
-playwright
 beautifulsoup4
 requests
 python-dotenv

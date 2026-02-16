@@ -3,9 +3,7 @@ services:
     name: tiktok-creator-api
     runtime: python
     rootDir: backend
-    buildCommand: |
-      pip install -r requirements.txt
-      playwright install chromium --with-deps
+    buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app.main:app -w 2 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION

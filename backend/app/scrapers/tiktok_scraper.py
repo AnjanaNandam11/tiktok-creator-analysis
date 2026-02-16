@@ -17,7 +17,11 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+try:
+    from playwright.sync_api import sync_playwright
+    HAS_PLAYWRIGHT = True
+except ImportError:
+    HAS_PLAYWRIGHT = False
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data"
 DATA_DIR.mkdir(exist_ok=True)
@@ -58,6 +62,9 @@ def parse_count(text: str) -> int:
 
 def _scrape_tiktok_user_sync(username: str, video_limit: int = 30) -> list[dict]:
     """Synchronous scraper — runs Playwright in the calling thread."""
+    if not HAS_PLAYWRIGHT:
+        return {"profile": {"username": username, "followers": 0}, "videos": []}
+
     username = username.lstrip("@")
     profile_url = f"https://www.tiktok.com/@{username}"
     videos = []
