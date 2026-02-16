@@ -57,6 +57,45 @@ def _generate_demo_videos(count: int = 25) -> list[dict]:
     return videos
 
 
+# --- Niche inference -----------------------------------------------------
+
+_NICHE_MAP = {
+    "comedy":      ["comedy", "funny", "humor", "joke", "jokes", "skit", "memes", "plottwist", "relatable"],
+    "dance":       ["dance", "choreography", "dancer", "dancechallenge", "dancetrending"],
+    "music":       ["music", "song", "singing", "singer", "musician", "guitar", "piano", "rap", "hiphop"],
+    "food":        ["food", "cooking", "recipe", "foodtok", "baking", "chef", "foodie", "mukbang"],
+    "fashion":     ["fashion", "ootd", "style", "outfit", "grwm", "haul"],
+    "beauty":      ["beauty", "makeup", "skincare", "beautytok", "glam"],
+    "fitness":     ["fitness", "gym", "workout", "health", "weightloss", "bodybuilding", "yoga"],
+    "gaming":      ["gaming", "gamer", "twitch", "fortnite", "minecraft", "valorant", "esports"],
+    "education":   ["education", "learn", "study", "studytok", "science", "math", "history"],
+    "tech":        ["tech", "coding", "programming", "developer", "ai", "software", "startup"],
+    "lifestyle":   ["lifestyle", "vlog", "dayinmylife", "routine", "aesthetic", "motivation"],
+    "sports":      ["sports", "football", "basketball", "soccer", "nfl", "nba", "athlete"],
+    "travel":      ["travel", "explore", "adventure", "wanderlust", "vacation"],
+    "pets":        ["pets", "dog", "cat", "puppy", "kitten", "animals", "dogsoftiktok", "catsoftiktok"],
+    "art":         ["art", "creative", "drawing", "painting", "artist", "diy", "craft"],
+}
+
+
+def _infer_niche(videos: list[dict]) -> str:
+    """Guess a niche from video hashtags. Returns best match or empty string."""
+    scores: dict[str, int] = {}
+    for v in videos:
+        tags = {t.strip().lower() for t in v.get("hashtags", "").replace("#", "").split(",") if t.strip()}
+        # also pull hashtags from captions
+        caption = v.get("caption", "")
+        tags.update(t.lower() for t in re.findall(r"#(\w+)", caption))
+        for niche, keywords in _NICHE_MAP.items():
+            for kw in keywords:
+                if kw in tags:
+                    scores[niche] = scores.get(niche, 0) + 1
+    if not scores:
+        return ""
+    best = max(scores, key=scores.get)
+    return best.title()
+
+
 # --- Helpers ------------------------------------------------------------
 
 def _upsert_videos(db: Session, creator_id: int, videos: list[dict]) -> int:
@@ -166,6 +205,13 @@ async def add_creator(username: str, niche: str = "", db: Session = Depends(get_
         videos_scraped = _upsert_videos(db, creator.id, videos)
         used_demo = True
 
+    # Auto-infer niche from video content if user didn't provide one
+    if not creator.niche and videos:
+        inferred = _infer_niche(videos)
+        if inferred:
+            creator.niche = inferred
+            db.commit()
+
     if used_demo:
         msg = f"Creator added with sample data ({videos_scraped} demo videos). TikTok blocked live scraping."
     elif videos_scraped > 0:
@@ -176,6 +222,7 @@ async def add_creator(username: str, niche: str = "", db: Session = Depends(get_
     return {
         "id": creator.id,
         "username": creator.username,
+        "niche": creator.niche,
         "follower_count": creator.follower_count,
         "total_videos": videos_scraped,
         "message": msg,
@@ -304,6 +351,13 @@ async def scrape_creator(username: str, db: Session = Depends(get_db)):
         used_demo = True
 
     count = _upsert_videos(db, creator.id, videos)
+
+    # Auto-infer niche if not set
+    if not creator.niche and videos:
+        inferred = _infer_niche(videos)
+        if inferred:
+            creator.niche = inferred
+            db.commit()
 
     return {
         "status": "ok",

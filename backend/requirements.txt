@@ -2,6 +2,7 @@ fastapi
 uvicorn
 gunicorn
 sqlalchemy
+psycopg2-binary
 pandas
 scikit-learn
 beautifulsoup4

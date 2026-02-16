@@ -1,3 +1,5 @@
+import os
+
 from sqlalchemy import (
     Column,
     Integer,
@@ -11,11 +13,19 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from datetime import datetime
 from pathlib import Path
 
-DATA_DIR = Path(__file__).resolve().parents[3] / "data"
-DATA_DIR.mkdir(exist_ok=True)
-DATABASE_URL = f"sqlite:///{DATA_DIR / 'tiktok_analysis.db'}"
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+if DATABASE_URL:
+    # Render provides postgres:// but SQLAlchemy 2.x needs postgresql://
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    engine = create_engine(DATABASE_URL)
+else:
+    # Local dev fallback: SQLite
+    DATA_DIR = Path(__file__).resolve().parents[3] / "data"
+    DATA_DIR.mkdir(exist_ok=True)
+    DATABASE_URL = f"sqlite:///{DATA_DIR / 'tiktok_analysis.db'}"
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
