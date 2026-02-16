@@ -38,6 +38,11 @@ export async function addCreator(username, niche = '') {
   return data
 }
 
+export async function updateCreator(id, niche) {
+  const { data } = await api.patch(`/creators/${id}?niche=${encodeURIComponent(niche)}`)
+  return data
+}
+
 export async function deleteCreator(id) {
   const { data } = await api.delete(`/creators/${id}`)
   return data

@@ -209,6 +209,17 @@ def top_videos(creator_id: int, db: Session = Depends(get_db)):
     return _get_content_performance(db, creator_id)
 
 
+@router.patch("/creators/{creator_id}")
+def update_creator(creator_id: int, niche: str = "", db: Session = Depends(get_db)):
+    """Update a creator's niche."""
+    creator = db.query(Creator).filter(Creator.id == creator_id).first()
+    if not creator:
+        raise HTTPException(status_code=404, detail="Creator not found")
+    creator.niche = niche.strip()
+    db.commit()
+    return {"status": "ok", "id": creator.id, "niche": creator.niche}
+
+
 @router.delete("/creators/{creator_id}")
 def delete_creator(creator_id: int, db: Session = Depends(get_db)):
     """Delete a creator and all their videos."""

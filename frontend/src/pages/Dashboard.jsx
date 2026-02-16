@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { getCreators, addCreator, deleteCreator } from '../api'
+import { getCreators, addCreator, deleteCreator, updateCreator } from '../api'
 import { fmt } from '../utils/format'
 
 const USERNAME_RE = /^[\w.]{1,30}$/
@@ -25,6 +25,8 @@ export default function Dashboard() {
   const [validationError, setValidationError] = useState('')
   const [deleting, setDeleting] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
+  const [editingNiche, setEditingNiche] = useState(null)
+  const [nicheInput, setNicheInput] = useState('')
 
   useEffect(() => {
     getCreators()
@@ -47,6 +49,23 @@ export default function Dashboard() {
     } finally {
       setDeleting(null)
     }
+  }
+
+  const startEditNiche = (creator) => {
+    setEditingNiche(creator.id)
+    setNicheInput(creator.niche || '')
+  }
+
+  const saveNiche = async (creatorId) => {
+    try {
+      await updateCreator(creatorId, nicheInput.trim())
+      setCreators((prev) =>
+        prev.map((c) => (c.id === creatorId ? { ...c, niche: nicheInput.trim() } : c))
+      )
+    } catch {
+      setError('Failed to update niche.')
+    }
+    setEditingNiche(null)
   }
 
   const handleUsernameChange = (e) => {
@@ -237,13 +256,52 @@ export default function Dashboard() {
                           <h3 className="text-lg font-semibold group-hover:text-pink-400 transition-colors">
                             @{creator.username}
                           </h3>
-                          <p className="text-gray-500 text-sm mt-1">{creator.niche || 'No niche set'}</p>
                         </div>
                         <span className="text-gray-600 group-hover:text-pink-500 transition-colors text-lg">
                           &rarr;
                         </span>
                       </div>
-                      <p className="text-pink-400 mt-4 text-lg font-medium">
+                    </Link>
+                    {/* Editable niche */}
+                    {editingNiche === creator.id ? (
+                      <div className="flex items-center gap-2 mt-1" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          autoFocus
+                          type="text"
+                          value={nicheInput}
+                          onChange={(e) => setNicheInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveNiche(creator.id)
+                            if (e.key === 'Escape') setEditingNiche(null)
+                          }}
+                          className="bg-gray-800 border border-pink-500/50 rounded px-2 py-0.5 text-sm text-white focus:outline-none focus:border-pink-500 w-full"
+                          placeholder="Enter niche..."
+                        />
+                        <button
+                          onClick={() => saveNiche(creator.id)}
+                          className="text-green-400 hover:text-green-300 text-xs font-medium shrink-0"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setEditingNiche(null)}
+                          className="text-gray-500 hover:text-gray-300 text-xs shrink-0"
+                        >
+                          Esc
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => { e.preventDefault(); startEditNiche(creator) }}
+                        className="text-gray-500 text-sm mt-1 hover:text-pink-400 transition-colors text-left"
+                        title="Click to edit niche"
+                      >
+                        {creator.niche || 'No niche set'}{' '}
+                        <span className="text-gray-600 text-xs">&#9998;</span>
+                      </button>
+                    )}
+                    <Link to={`/creator/${creator.id}`} className="block">
+                      <p className="text-pink-400 mt-3 text-lg font-medium">
                         {fmt(creator.follower_count || 0)} followers
                       </p>
                     </Link>
