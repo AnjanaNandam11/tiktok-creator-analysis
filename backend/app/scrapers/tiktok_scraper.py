@@ -17,6 +17,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+import requests
+
 try:
     from playwright.sync_api import sync_playwright
     HAS_PLAYWRIGHT = True
@@ -25,6 +27,39 @@ except ImportError:
 
 DATA_DIR = Path(__file__).resolve().parents[3] / "data"
 DATA_DIR.mkdir(exist_ok=True)
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+
+def _fetch_profile_http(username: str) -> dict:
+    """Lightweight HTTP fetch to get real profile stats without a browser."""
+    profile = {"username": username, "followers": 0}
+    try:
+        resp = requests.get(
+            f"https://www.tiktok.com/@{username}",
+            headers=HEADERS,
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            extracted, _ = _extract_from_embedded_json(resp.text, username)
+            if extracted.get("followers", 0) > 0:
+                profile = extracted
+                print(f"  [http] Got real profile for @{username}: {profile['followers']} followers")
+            else:
+                print(f"  [http] Page loaded but no profile data for @{username}")
+        else:
+            print(f"  [http] TikTok returned {resp.status_code} for @{username}")
+    except Exception as e:
+        print(f"  [http] Failed to fetch @{username}: {e}")
+    return profile
 
 
 def parse_count(text: str) -> int:
@@ -62,9 +97,6 @@ def parse_count(text: str) -> int:
 
 def _scrape_tiktok_user_sync(username: str, video_limit: int = 30) -> list[dict]:
     """Synchronous scraper — runs Playwright in the calling thread."""
-    if not HAS_PLAYWRIGHT:
-        return {"profile": {"username": username, "followers": 0}, "videos": []}
-
     username = username.lstrip("@")
     profile_url = f"https://www.tiktok.com/@{username}"
     videos = []
@@ -167,10 +199,17 @@ def _scrape_tiktok_user_sync(username: str, video_limit: int = 30) -> list[dict]
 async def scrape_tiktok_user(username: str, video_limit: int = 30) -> dict:
     """Async wrapper that runs the sync scraper in a thread.
 
+    Falls back to lightweight HTTP profile fetch when Playwright is unavailable.
+
     Returns:
         Dict with 'profile' (dict) and 'videos' (list[dict]).
     """
-    return await asyncio.to_thread(_scrape_tiktok_user_sync, username, video_limit)
+    if HAS_PLAYWRIGHT:
+        return await asyncio.to_thread(_scrape_tiktok_user_sync, username, video_limit)
+
+    # No Playwright — try lightweight HTTP fetch for real profile data
+    profile = await asyncio.to_thread(_fetch_profile_http, username)
+    return {"profile": profile, "videos": []}
 
 
 # ---------------------------------------------------------------------------
