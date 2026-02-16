@@ -16,14 +16,9 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="TikTok Creator Analysis", version="0.1.0")
 
-allowed_origins = os.getenv(
-    "CORS_ORIGINS", "http://localhost:5173,http://localhost:5175"
-).split(",")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
